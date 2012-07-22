@@ -3,7 +3,6 @@
 #include <string.h>
 #include <glib.h>
 
-
 #include "mscheme.h"
 
 s_environ *env_new(s_environ *parent) {
@@ -23,7 +22,7 @@ s_value *env_get(s_environ *env, char *key) {
     return r;
   if (env->parent)
     return env_get(env->parent, key);
-  printf("Variable %s not found\n", key);
+  pmesg("Variable %s not found\n", key);
   return 0;
 }
 
@@ -33,7 +32,7 @@ void env_set(s_environ *env, char *key, s_value *value) {
     return env_add(env, key, value);
   if (env->parent)
     return env_set(env->parent, key, value);
-  printf("Variable %s not found\n", key);
+  pmesg("Variable %s not found\n", key);
 }	
 
 s_value *mkatom(char *s) {
@@ -41,6 +40,15 @@ s_value *mkatom(char *s) {
   r->atom.type = ATOM;
   r->atom.val  = s;
   return r;
+}
+
+s_atom rtatom(s_value *p) {
+  if (p->type == ATOM)
+    return p->atom;
+  else {
+    printf("Not an atom: ");
+    print(p);
+  }
 }
 
 s_value *mkcons(s_value *p, s_value *n) {
@@ -58,11 +66,44 @@ s_value *mkbltn(s_value *(*fun)(s_value *, s_environ *)) {
   return r;
 }
 
+s_bltn rtbltn(s_value *p) {
+  if (p->type == BLTN)
+    return p->bltn;
+  else {
+    printf("Not a builtin: ");
+    print(p);
+  }
+}
+
+s_value *mktail(s_value *(*fun)(s_value *, s_environ *)) {
+  s_value *r   = mkbltn(fun);
+  r->bltn.type = TAIL;
+  return r;
+}
+
+s_bltn rttail(s_value *p) {
+  if (p->type == TAIL)
+    return p->tail;
+  else {
+    printf("Not a tail: ");
+    print(p);
+  }
+}
+
 s_value *mkbool(char b) {
   s_value *r   = (s_value *)malloc(sizeof(s_bool));
   r->sbln.type = BOOL;
   r->sbln.val  = b;
   return r;
+}
+
+s_bool rtbool(s_value *p) {
+  if (p->type == BOOL)
+    return p->sbln;
+  else {
+    printf("Not a bool: ");
+    print(p);
+  }
 }
 
 s_value *mkintg(int i) {
@@ -72,6 +113,15 @@ s_value *mkintg(int i) {
   return r;
 }
 
+s_intg rtintg(s_value *p) {
+  if (p->type == INTG)
+    return p->intg;
+  else {
+    printf("Not an int: ");
+    print(p);
+  }
+}
+
 s_value *lambda(s_value *body, s_value *args, s_environ *env) {
   s_value *r   = (s_value *)malloc(sizeof(s_proc));
   r->proc.type = PROC;
@@ -79,6 +129,41 @@ s_value *lambda(s_value *body, s_value *args, s_environ *env) {
   r->proc.args = args;
   r->proc.body = body;
   return r;
+}
+
+s_proc rtproc(s_value *p) {
+  if (p->type == PROC)
+    return p->proc;
+  else {
+    printf("Not a proc: ");
+    print(p);
+  }
+}
+
+s_value *mktran(s_value *lits, s_value *rules) {
+  pmesg("Mktran: ");
+  dprint(lits);
+  dprint(rules);
+  s_value *r   = (s_value *)malloc(sizeof(s_tran));
+  r->tran.type = TRAN;
+  r->tran.lits  = env_new(0);
+  r->tran.rules = rules;
+  while (lits && car(lits)) {
+    env_add(r->tran.lits,car(lits)->atom.val,mkbool(1));
+    lits = cdr(lits);
+  }
+  pmesg("----\n");
+  dprint_env(r->tran.lits);
+  return r;
+}
+
+s_tran rttran(s_value *p) {
+  if (p->type == TRAN)
+    return p->tran;
+  else {
+    printf("Not a translation: ");
+    print(p);
+  }
 }
 
 s_value *car(s_value * p) {
@@ -99,6 +184,24 @@ s_value *cdr(s_value * p) {
   }
 }
 
+void set_car(s_value * p, s_value *s) {
+  if (p->type == CONS)
+    p->cons.curr = s;
+  else {
+    printf("Set-car: not a cons: ");
+    print(p);
+  }
+}
+
+void set_cdr(s_value * p, s_value *s) {
+  if (p->type == CONS)
+    p->cons.next = s;
+  else {
+    printf("Set-cdr: not a cons: ");
+    print(p);
+  }
+}
+
 void prnt(s_value *node) {
   if (node == 0) {
     printf("()");
@@ -114,10 +217,17 @@ void prnt(s_value *node) {
     if (car(node))
       prnt(car(node));
     while (cdr(cur) != 0) {
-      printf(" ");
       cur = cdr(cur);
-      if (car(cur))
-	prnt(car(cur));
+      if (cur->type == CONS) {
+	if (car(cur)) {
+	  printf(" ");
+	  prnt(car(cur));
+	}
+      } else {
+	printf(" . ");
+	prnt(cur);
+	break;
+      }
     }
     printf(")");
     break;
@@ -173,3 +283,20 @@ void print_env(s_environ *env) {
   prenv(env);
   printf("\n");
 }
+
+#ifdef NDEBUG
+void dprint(s_value *node) { return; }
+
+void dprint_env(s_environ *env) { return; }
+
+#else
+
+void dprint(s_value *node) {
+  print(node);
+}
+
+void dprint_env(s_environ *env) {
+  print_env(env);
+}
+
+#endif

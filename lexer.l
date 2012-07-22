@@ -12,6 +12,7 @@
 \) { return RPAREN; }
 #t { yylval=mkbool(1); return T_BOOL; }
 #f { yylval=mkbool(0); return T_BOOL; }
+\. { return DOT; }
 \' { return QUOTE; }
 \` { return BACKTICK; }
 \,@ { return ATCOMMA; }
